@@ -44,6 +44,7 @@ jobs:
   validate:
     name: Validate Bicep
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -80,6 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     needs: validate
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
