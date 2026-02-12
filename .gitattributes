@@ -1,0 +1,49 @@
+# =============================================================================
+# .gitattributes — Line Ending Normalization
+# =============================================================================
+# All text files are stored as LF in the repository.
+# Git converts to the OS-native line ending on checkout (CRLF on Windows,
+# LF on macOS/Linux). This ensures diffs are clean and cross-platform
+# collaboration is seamless regardless of individual developer settings.
+# =============================================================================
+
+# Auto-detect text files and normalise to LF on commit
+* text=auto eol=lf
+
+# =============================================================================
+# Explicit overrides by file type
+# =============================================================================
+
+# Source / config — always LF in repo
+*.bicep        text eol=lf
+*.bicepparam   text eol=lf
+*.json         text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.md           text eol=lf
+*.sql          text eol=lf
+*.py           text eol=lf
+*.sh           text eol=lf
+*.ps1          text eol=lf
+*.psm1         text eol=lf
+*.psd1         text eol=lf
+*.txt          text eol=lf
+*.csv          text eol=lf
+*.xml          text eol=lf
+
+# Windows batch/cmd — must stay CRLF even in the repo
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
+
+# Binary files — no line-ending conversion
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.ico          binary
+*.zip          binary
+*.gz           binary
+*.tar          binary
+*.pdf          binary
+*.xlsx         binary
+*.docx         binary

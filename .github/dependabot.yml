@@ -1,0 +1,21 @@
+# =============================================================================
+# Dependabot Configuration
+# =============================================================================
+# Scans GitHub Actions workflows for outdated action versions and opens PRs
+# to keep them up to date.
+# =============================================================================
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - github-actions

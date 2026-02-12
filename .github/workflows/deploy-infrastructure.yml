@@ -1,0 +1,152 @@
+# =============================================================================
+# deploy-infrastructure.yml — Bicep IaC Deployment for SQL CES Fabric
+# =============================================================================
+# Triggers:
+#   - Push to main   → deploys infrastructure
+#   - Pull request   → runs what-if preview
+#   - Manual dispatch → deploys infrastructure
+#
+# Required GitHub Secrets:
+#   AZURE_CLIENT_ID        — Service principal or managed identity client ID
+#   AZURE_SUBSCRIPTION_ID  — Target Azure subscription ID
+#   AZURE_TENANT_ID        — Entra ID tenant ID
+#   SQL_ADMIN_SID          — Entra ID object ID for the SQL administrator group
+#
+# Required GitHub Variables:
+#   AZURE_RG               — Target resource group name
+#   SQL_ADMIN_LOGIN        — Display name of the SQL Entra admin group
+# =============================================================================
+
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/bicep/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infrastructure/bicep/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  BICEP_DIR: infrastructure/bicep
+
+jobs:
+  # ===========================================================================
+  # Validate — runs on every push and PR
+  # ===========================================================================
+  validate:
+    name: Validate Bicep
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate deployment
+        uses: azure/bicep-deploy@v2
+        with:
+          type: deployment
+          operation: validate
+          name: ces-infra-validate
+          scope: resourceGroup
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: ${{ vars.AZURE_RG }}
+          template-file: ${{ env.BICEP_DIR }}/main.bicep
+          parameters: >
+            location=australiaeast
+            namePrefix=ces
+            entraAdminLogin=${{ vars.SQL_ADMIN_LOGIN }}
+            entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
+            entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
+
+  # ===========================================================================
+  # What-If — runs on pull requests to preview changes
+  # ===========================================================================
+  what-if:
+    name: What-If Preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: validate
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run What-If analysis
+        uses: azure/bicep-deploy@v2
+        with:
+          type: deployment
+          operation: whatIf
+          name: ces-infra-whatif
+          scope: resourceGroup
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: ${{ vars.AZURE_RG }}
+          template-file: ${{ env.BICEP_DIR }}/main.bicep
+          parameters: >
+            location=australiaeast
+            namePrefix=ces
+            entraAdminLogin=${{ vars.SQL_ADMIN_LOGIN }}
+            entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
+            entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
+
+  # ===========================================================================
+  # Deploy — runs on push to main or manual dispatch
+  # ===========================================================================
+  deploy:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: validate
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep template
+        id: deploy
+        uses: azure/bicep-deploy@v2
+        with:
+          type: deployment
+          operation: create
+          name: ces-infra-${{ github.run_number }}
+          scope: resourceGroup
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: ${{ vars.AZURE_RG }}
+          template-file: ${{ env.BICEP_DIR }}/main.bicep
+          parameters: >
+            location=australiaeast
+            namePrefix=ces
+            entraAdminLogin=${{ vars.SQL_ADMIN_LOGIN }}
+            entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
+            entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Display deployment outputs
+        run: |
+          echo "SQL Server: ${{ steps.deploy.outputs.sqlServerFqdn }}"
+          echo "UAMI Client ID: ${{ steps.deploy.outputs.uamiClientId }}"
