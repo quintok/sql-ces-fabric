@@ -11,10 +11,10 @@
 #   AZURE_SUBSCRIPTION_ID  — Target Azure subscription ID
 #   AZURE_TENANT_ID        — Entra ID tenant ID
 #   SQL_ADMIN_SID          — Entra ID object ID for the SQL administrator group
+#   SQL_ADMIN_LOGIN        — Display name of the SQL Entra admin group
 #
 # Required GitHub Variables:
 #   AZURE_RG               — Target resource group name
-#   SQL_ADMIN_LOGIN        — Display name of the SQL Entra admin group
 # =============================================================================
 
 name: Deploy Infrastructure
@@ -68,7 +68,7 @@ jobs:
           parameters: >
             location=australiaeast
             namePrefix=ces
-            entraAdminLogin=${{ vars.SQL_ADMIN_LOGIN }}
+            entraAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }}
             entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
             entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
 
@@ -104,7 +104,7 @@ jobs:
           parameters: >
             location=australiaeast
             namePrefix=ces
-            entraAdminLogin=${{ vars.SQL_ADMIN_LOGIN }}
+            entraAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }}
             entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
             entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
 
@@ -142,7 +142,7 @@ jobs:
           parameters: >
             location=australiaeast
             namePrefix=ces
-            entraAdminLogin=${{ vars.SQL_ADMIN_LOGIN }}
+            entraAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }}
             entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
             entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
 
