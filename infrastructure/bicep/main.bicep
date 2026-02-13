@@ -157,6 +157,10 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
           capacity: 200
         }
         maxSizeBytes: 53687091200 // 50 GB - valid for Standard 200 eDTU
+        perDatabaseSettings: {
+          minCapacity: '0'
+          maxCapacity: '100' // Max DTU per database (must be >= 10 for Standard)
+        }
       }
     ]
 

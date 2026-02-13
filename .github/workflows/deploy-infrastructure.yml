@@ -1,10 +1,15 @@
 # =============================================================================
 # deploy-infrastructure.yml — Bicep IaC Deployment for SQL CES Fabric
 # =============================================================================
+# Uses Azure Deployment Stacks for managed resource lifecycle:
+#   - Automatic cleanup of removed resources
+#   - Drift protection (once deny settings enabled)
+#   - Single stack name with versioned history
+#
 # Triggers:
-#   - Push to main   → deploys infrastructure
-#   - Pull request   → runs what-if preview
-#   - Manual dispatch → deploys infrastructure
+#   - Push to main   → deploys infrastructure via stack
+#   - Pull request   → validates and previews changes
+#   - Manual dispatch → deploys infrastructure via stack
 #
 # Required GitHub Secrets:
 #   AZURE_CLIENT_ID        — Service principal or managed identity client ID
@@ -58,12 +63,12 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Validate deployment
+      - name: Validate deployment stack
         uses: azure/bicep-deploy@v2
         with:
-          type: deployment
+          type: deploymentStack
           operation: validate
-          name: ces-infra-validate
+          name: ces-infra
           scope: resourceGroup
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ vars.AZURE_RG }}
@@ -76,10 +81,14 @@ jobs:
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
             }
+          action-on-unmanage-resources: detach
+          deny-settings-mode: none
 
   # ===========================================================================
   # What-If — runs on pull requests to preview changes
   # ===========================================================================
+  # Note: Deployment stack validate includes what-if preview in its output
+  # This job provides an explicit what-if for PR visibility
   what-if:
     name: What-If Preview
     runs-on: ubuntu-latest
@@ -119,6 +128,11 @@ jobs:
   # ===========================================================================
   # Deploy — runs on push to main or manual dispatch
   # ===========================================================================
+  # Uses deployment stacks for managed resource lifecycle
+  # Migration mode: detach orphaned resources, no deny settings
+  # TODO: After stable, change to:
+  #   action-on-unmanage-resources: delete
+  #   deny-settings-mode: denyWriteAndDelete
   deploy:
     name: Deploy to Azure
     runs-on: ubuntu-latest
@@ -136,13 +150,13 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy Bicep template
+      - name: Deploy via deployment stack
         id: deploy
         uses: azure/bicep-deploy@v2
         with:
-          type: deployment
+          type: deploymentStack
           operation: create
-          name: ces-infra-${{ github.run_number }}
+          name: ces-infra
           scope: resourceGroup
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ vars.AZURE_RG }}
@@ -155,6 +169,8 @@ jobs:
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
             }
+          action-on-unmanage-resources: detach
+          deny-settings-mode: none
 
       - name: Display deployment outputs
         run: |
