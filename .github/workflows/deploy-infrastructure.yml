@@ -24,10 +24,12 @@ on:
     branches: [main]
     paths:
       - 'infrastructure/bicep/**'
+      - '.github/workflows/deploy-infrastructure.yml'
   pull_request:
     branches: [main]
     paths:
       - 'infrastructure/bicep/**'
+      - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
 
 permissions:
