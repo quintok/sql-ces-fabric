@@ -62,7 +62,7 @@ var vnetName = '${namePrefix}-vnet'
 var privateEndpointSubnetName = 'snet-private-endpoints'
 var containerSubnetName = 'snet-containers'
 var uamiName = '${namePrefix}-uami-sql'
-var acrName = replace('${namePrefix}acr', '-', '') // ACR names must be alphanumeric
+var acrName = 'acr${uniqueString(resourceGroup().id)}' // 16 chars, alphanumeric, globally unique
 var aciName = '${namePrefix}-loadgen'
 var privateDnsZoneName = 'privatelink${environment().suffixes.sqlServerHostname}'
 

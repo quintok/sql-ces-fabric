@@ -15,7 +15,7 @@
 #
 # Required GitHub Variables:
 #   AZURE_RG               — Target resource group name
-#   ACR_NAME               — Azure Container Registry name (e.g., cesacr)
+#   ACR_NAME               — Azure Container Registry name (from deployment output acrName)
 # =============================================================================
 
 name: Build Load Generator

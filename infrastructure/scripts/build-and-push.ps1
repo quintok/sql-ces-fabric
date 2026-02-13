@@ -12,15 +12,16 @@
 
 .PARAMETER AcrName
     Name of the Azure Container Registry (without .azurecr.io).
+    Get from deployment output: az deployment group show -g <rg> -n <deployment> --query properties.outputs.acrName.value -o tsv
 
 .PARAMETER ImageTag
     Tag for the container image. Defaults to 'latest'.
 
 .EXAMPLE
-    ./build-and-push.ps1 -ResourceGroup rg-sql-ces -AcrName cesacr
+    ./build-and-push.ps1 -ResourceGroup rg-sql-ces -AcrName acr5k7h3jf8s9d2m
 
 .EXAMPLE
-    ./build-and-push.ps1 -ResourceGroup rg-sql-ces -AcrName cesacr -ImageTag v1.0.0
+    ./build-and-push.ps1 -ResourceGroup rg-sql-ces -AcrName acr5k7h3jf8s9d2m -ImageTag v1.0.0
 #>
 
 [CmdletBinding()]

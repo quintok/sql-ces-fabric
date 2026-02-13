@@ -44,7 +44,7 @@ on:
         type: boolean
         default: false
       load_generator_image:
-        description: 'Load generator container image (e.g., cesacr.azurecr.io/loadgen:latest)'
+        description: 'Load generator container image (use acrLoginServer output, e.g., <acr>.azurecr.io/loadgen:latest)'
         required: false
         type: string
         default: ''

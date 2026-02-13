@@ -19,8 +19,9 @@ param containerSubnetPrefix = '10.0.2.0/24'
 // Load Generator — set deployLoadGenerator=true after pushing the container image
 param deployLoadGenerator = false
 
-// Set this to the full image path after building and pushing, e.g.:
-// param loadGeneratorImage = 'cesacr.azurecr.io/loadgen:latest'
+// Set this to the full image path after building and pushing
+// Get the ACR name from deployment output: az deployment group show -g <rg> -n <deployment> --query properties.outputs.acrLoginServer.value -o tsv
+// Example: param loadGeneratorImage = '<acrLoginServer>/loadgen:latest'
 param loadGeneratorImage = ''
 
 // Entra ID administrator — replace with your Entra security group details
