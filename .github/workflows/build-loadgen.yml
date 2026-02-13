@@ -14,8 +14,7 @@
 #   AZURE_TENANT_ID        — Entra ID tenant ID
 #
 # Required GitHub Variables:
-#   AZURE_RG               — Target resource group name
-#   ACR_NAME               — Azure Container Registry name (from deployment output acrName)
+#   AZURE_RG               — Target resource group name (ACR name is discovered dynamically)
 # =============================================================================
 
 name: Build Load Generator
@@ -93,6 +92,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Discover ACR name
+        id: acr
+        run: |
+          ACR_NAME=$(az acr list --resource-group ${{ vars.AZURE_RG }} --query "[0].name" -o tsv)
+          if [ -z "$ACR_NAME" ]; then
+            echo "::error::No ACR found in resource group ${{ vars.AZURE_RG }}. Deploy infrastructure first."
+            exit 1
+          fi
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "Discovered ACR: $ACR_NAME"
+
       - name: Set image tag
         id: vars
         run: |
@@ -102,20 +119,13 @@ jobs:
             TAG="${GITHUB_SHA::8}"
           fi
           echo "image_tag=$TAG" >> $GITHUB_OUTPUT
-          echo "full_image=${{ vars.ACR_NAME }}.azurecr.io/loadgen:$TAG" >> $GITHUB_OUTPUT
+          echo "full_image=${{ steps.acr.outputs.acr_name }}.azurecr.io/loadgen:$TAG" >> $GITHUB_OUTPUT
           echo "Image will be tagged as: $TAG"
-
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Build and push via ACR Tasks
         run: |
           az acr build \
-            --registry ${{ vars.ACR_NAME }} \
+            --registry ${{ steps.acr.outputs.acr_name }} \
             --resource-group ${{ vars.AZURE_RG }} \
             --image "loadgen:${{ steps.vars.outputs.image_tag }}" \
             --image "loadgen:latest" \
@@ -127,7 +137,7 @@ jobs:
           echo "## 🐳 Container Image Built" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${{ steps.vars.outputs.full_image }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Also tagged as:** \`${{ vars.ACR_NAME }}.azurecr.io/loadgen:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Also tagged as:** \`${{ steps.acr.outputs.acr_name }}.azurecr.io/loadgen:latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "To deploy the load generator, run the **Deploy Infrastructure** workflow with:" >> $GITHUB_STEP_SUMMARY
