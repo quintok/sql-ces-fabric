@@ -31,6 +31,15 @@ param vnetAddressPrefix string = '10.0.0.0/16'
 @description('Address prefix for the private endpoint subnet.')
 param privateEndpointSubnetPrefix string = '10.0.1.0/24'
 
+@description('Address prefix for the container instances subnet.')
+param containerSubnetPrefix string = '10.0.2.0/24'
+
+@description('Deploy the load generator container instance. Set to true after pushing the container image.')
+param deployLoadGenerator bool = false
+
+@description('Container image for the load generator (e.g., myregistry.azurecr.io/loadgen:latest).')
+param loadGeneratorImage string = ''
+
 @description('Entra ID administrator login name (display name of the group or user).')
 param entraAdminLogin string
 
@@ -51,7 +60,10 @@ var sqlServerName = '${namePrefix}-sql-server'
 var elasticPoolName = '${namePrefix}-elastic-pool'
 var vnetName = '${namePrefix}-vnet'
 var privateEndpointSubnetName = 'snet-private-endpoints'
+var containerSubnetName = 'snet-containers'
 var uamiName = '${namePrefix}-uami-sql'
+var acrName = replace('${namePrefix}acr', '-', '') // ACR names must be alphanumeric
+var aciName = '${namePrefix}-loadgen'
 var privateDnsZoneName = 'privatelink${environment().suffixes.sqlServerHostname}'
 
 // ============================================================================
@@ -83,6 +95,12 @@ module virtualNetwork 'br/public:avm/res/network/virtual-network:0.5.2' = {
       {
         name: privateEndpointSubnetName
         addressPrefix: privateEndpointSubnetPrefix
+      }
+      {
+        name: containerSubnetName
+        addressPrefix: containerSubnetPrefix
+        // Delegation required for Azure Container Instances
+        delegation: 'Microsoft.ContainerInstance/containerGroups'
       }
     ]
     tags: tags
@@ -221,6 +239,41 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
 }
 
 // ============================================================================
+// Azure Container Registry (for load generator image)
+// ============================================================================
+
+module containerRegistry 'modules/container-registry.bicep' = {
+  name: 'deploy-acr'
+  params: {
+    name: acrName
+    location: location
+    sku: 'Basic'
+    adminUserEnabled: true
+    tags: tags
+  }
+}
+
+// ============================================================================
+// Load Generator Container Instance (conditional)
+// ============================================================================
+
+module loadGenerator 'modules/container-instance.bicep' = if (deployLoadGenerator && !empty(loadGeneratorImage)) {
+  name: 'deploy-loadgen'
+  params: {
+    name: aciName
+    location: location
+    subnetResourceId: virtualNetwork.outputs.subnetResourceIds[1] // Container subnet
+    userAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
+    sqlServerFqdn: sqlServer.outputs.fullyQualifiedDomainName
+    databases: 'tenant_db_alpha,tenant_db_beta'
+    containerImage: loadGeneratorImage
+    minDelaySeconds: '1'
+    maxDelaySeconds: '5'
+    tags: tags
+  }
+}
+
+// ============================================================================
 // Outputs
 // ============================================================================
 
@@ -244,3 +297,8 @@ output uamiClientId string = userAssignedIdentity.outputs.clientId
 
 @description('The principal ID of the user-assigned managed identity.')
 output uamiPrincipalId string = userAssignedIdentity.outputs.principalId
+@description('The login server URL of the container registry.')
+output acrLoginServer string = containerRegistry.outputs.loginServer
+
+@description('The name of the container registry.')
+output acrName string = containerRegistry.outputs.name

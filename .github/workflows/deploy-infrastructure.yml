@@ -20,6 +20,7 @@
 #
 # Required GitHub Variables:
 #   AZURE_RG               — Target resource group name
+#   ACR_NAME               — Azure Container Registry name (set after first deploy)
 # =============================================================================
 
 name: Deploy Infrastructure
@@ -36,6 +37,17 @@ on:
       - 'infrastructure/bicep/**'
       - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
+    inputs:
+      deploy_load_generator:
+        description: 'Deploy the load generator container instance'
+        required: false
+        type: boolean
+        default: false
+      load_generator_image:
+        description: 'Load generator container image (e.g., cesacr.azurecr.io/loadgen:latest)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   id-token: write
@@ -79,7 +91,9 @@ jobs:
               "namePrefix": "ces",
               "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
-              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
+              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
+              "deployLoadGenerator": ${{ inputs.deploy_load_generator || false }},
+              "loadGeneratorImage": "${{ inputs.load_generator_image || '' }}"
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
@@ -122,7 +136,9 @@ jobs:
               "namePrefix": "ces",
               "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
-              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
+              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
+              "deployLoadGenerator": false,
+              "loadGeneratorImage": ""
             }
 
   # ===========================================================================
@@ -167,7 +183,9 @@ jobs:
               "namePrefix": "ces",
               "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
-              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
+              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
+              "deployLoadGenerator": ${{ inputs.deploy_load_generator || false }},
+              "loadGeneratorImage": "${{ inputs.load_generator_image || '' }}"
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
@@ -176,3 +194,5 @@ jobs:
         run: |
           echo "SQL Server: ${{ steps.deploy.outputs.sqlServerFqdn }}"
           echo "UAMI Client ID: ${{ steps.deploy.outputs.uamiClientId }}"
+          echo "ACR Login Server: ${{ steps.deploy.outputs.acrLoginServer }}"
+          echo "ACR Name: ${{ steps.deploy.outputs.acrName }}"

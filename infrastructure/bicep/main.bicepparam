@@ -14,6 +14,15 @@ param vnetAddressPrefix = '10.0.0.0/16'
 
 param privateEndpointSubnetPrefix = '10.0.1.0/24'
 
+param containerSubnetPrefix = '10.0.2.0/24'
+
+// Load Generator — set deployLoadGenerator=true after pushing the container image
+param deployLoadGenerator = false
+
+// Set this to the full image path after building and pushing, e.g.:
+// param loadGeneratorImage = 'cesacr.azurecr.io/loadgen:latest'
+param loadGeneratorImage = ''
+
 // Entra ID administrator — replace with your Entra security group details
 param entraAdminLogin = '<entra-admin-group-display-name>'
 

@@ -1,0 +1,135 @@
+# =============================================================================
+# build-loadgen.yml — Build and Push Load Generator Container
+# =============================================================================
+# Builds the Python load generator container and pushes to Azure Container
+# Registry using ACR Tasks (no Docker daemon required on runner).
+#
+# Triggers:
+#   - Push to main with changes in loadgen/
+#   - Manual dispatch with optional image tag
+#
+# Required GitHub Secrets:
+#   AZURE_CLIENT_ID        — Service principal or managed identity client ID
+#   AZURE_SUBSCRIPTION_ID  — Target Azure subscription ID
+#   AZURE_TENANT_ID        — Entra ID tenant ID
+#
+# Required GitHub Variables:
+#   AZURE_RG               — Target resource group name
+#   ACR_NAME               — Azure Container Registry name (e.g., cesacr)
+# =============================================================================
+
+name: Build Load Generator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'loadgen/**'
+      - '.github/workflows/build-loadgen.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'loadgen/**'
+      - '.github/workflows/build-loadgen.yml'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag (defaults to git SHA)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  LOADGEN_DIR: loadgen
+
+jobs:
+  # ===========================================================================
+  # Lint and Test — runs on every push and PR
+  # ===========================================================================
+  lint:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: ${{ env.LOADGEN_DIR }}
+        run: uv sync --dev
+
+      - name: Run ruff linter
+        working-directory: ${{ env.LOADGEN_DIR }}
+        run: uv run ruff check src/
+
+      - name: Run ruff formatter check
+        working-directory: ${{ env.LOADGEN_DIR }}
+        run: uv run ruff format --check src/
+
+  # ===========================================================================
+  # Build and Push — runs on push to main or manual dispatch
+  # ===========================================================================
+  build:
+    name: Build and Push Container
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: lint
+    environment: production
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+      full_image: ${{ steps.vars.outputs.full_image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set image tag
+        id: vars
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            TAG="${{ inputs.image_tag }}"
+          else
+            TAG="${GITHUB_SHA::8}"
+          fi
+          echo "image_tag=$TAG" >> $GITHUB_OUTPUT
+          echo "full_image=${{ vars.ACR_NAME }}.azurecr.io/loadgen:$TAG" >> $GITHUB_OUTPUT
+          echo "Image will be tagged as: $TAG"
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push via ACR Tasks
+        run: |
+          az acr build \
+            --registry ${{ vars.ACR_NAME }} \
+            --resource-group ${{ vars.AZURE_RG }} \
+            --image "loadgen:${{ steps.vars.outputs.image_tag }}" \
+            --image "loadgen:latest" \
+            --file ${{ env.LOADGEN_DIR }}/Dockerfile \
+            ${{ env.LOADGEN_DIR }}
+
+      - name: Output image details
+        run: |
+          echo "## 🐳 Container Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ steps.vars.outputs.full_image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Also tagged as:** \`${{ vars.ACR_NAME }}.azurecr.io/loadgen:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "To deploy the load generator, run the **Deploy Infrastructure** workflow with:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`deploy_load_generator\`: \`true\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`load_generator_image\`: \`${{ steps.vars.outputs.full_image }}\`" >> $GITHUB_STEP_SUMMARY
