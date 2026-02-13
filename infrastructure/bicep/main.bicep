@@ -151,12 +151,14 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
     elasticPools: [
       {
         name: elasticPoolName
+        availabilityZone: 'NoPreference' // No specific zone
         sku: {
           name: 'StandardPool'
           tier: 'Standard'
           capacity: 200
         }
         maxSizeBytes: 53687091200 // 50 GB - valid for Standard 200 eDTU
+        zoneRedundant: false
         perDatabaseSettings: {
           minCapacity: '0'
           maxCapacity: '100' // Max DTU per database (must be >= 10 for Standard)
@@ -168,6 +170,7 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
     databases: [
       {
         name: 'tenant_db_alpha'
+        availabilityZone: 'NoPreference' // No specific zone
         sku: {
           name: 'ElasticPool'
           tier: 'Standard'
@@ -177,9 +180,11 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
           sqlServerName,
           elasticPoolName
         )
+        zoneRedundant: false
       }
       {
         name: 'tenant_db_beta'
+        availabilityZone: 'NoPreference' // No specific zone
         sku: {
           name: 'ElasticPool'
           tier: 'Standard'
@@ -189,6 +194,7 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
           sqlServerName,
           elasticPoolName
         )
+        zoneRedundant: false
       }
     ]
 
