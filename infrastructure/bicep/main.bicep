@@ -180,6 +180,7 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
           sqlServerName,
           elasticPoolName
         )
+        maxSizeBytes: 2147483648 // 2 GB - explicit size for Standard tier
         zoneRedundant: false
       }
       {
@@ -194,6 +195,7 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
           sqlServerName,
           elasticPoolName
         )
+        maxSizeBytes: 2147483648 // 2 GB - explicit size for Standard tier
         zoneRedundant: false
       }
     ]
