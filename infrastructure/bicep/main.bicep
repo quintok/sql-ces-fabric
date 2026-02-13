@@ -118,6 +118,15 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
     name: sqlServerName
     location: location
 
+    // Enable Security Alert Policy (Defender for SQL)
+    securityAlertPolicies: [
+      {
+        name: 'Default'
+        emailAccountAdmins: true
+        state: 'Enabled'
+      }
+    ]
+
     // Entra ID only authentication (no SQL auth)
     administrators: {
       azureADOnlyAuthentication: true
@@ -147,6 +156,7 @@ module sqlServer 'br/public:avm/res/sql/server:0.12.0' = {
           tier: 'Standard'
           capacity: 200
         }
+        maxSizeBytes: 53687091200 // 50 GB - valid for Standard 200 eDTU
       }
     ]
 
