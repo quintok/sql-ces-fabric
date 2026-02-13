@@ -66,12 +66,14 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ vars.AZURE_RG }}
           template-file: ${{ env.BICEP_DIR }}/main.bicep
-          parameters: >
-            location=australiaeast
-            namePrefix=ces
-            entraAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }}
-            entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
-            entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
+          parameters: |
+            {
+              "location": "australiaeast",
+              "namePrefix": "ces",
+              "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
+              "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
+              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
 
   # ===========================================================================
   # What-If — runs on pull requests to preview changes
@@ -103,12 +105,14 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ vars.AZURE_RG }}
           template-file: ${{ env.BICEP_DIR }}/main.bicep
-          parameters: >
-            location=australiaeast
-            namePrefix=ces
-            entraAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }}
-            entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
-            entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
+          parameters: |
+            {
+              "location": "australiaeast",
+              "namePrefix": "ces",
+              "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
+              "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
+              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
 
   # ===========================================================================
   # Deploy — runs on push to main or manual dispatch
@@ -141,12 +145,14 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resource-group-name: ${{ vars.AZURE_RG }}
           template-file: ${{ env.BICEP_DIR }}/main.bicep
-          parameters: >
-            location=australiaeast
-            namePrefix=ces
-            entraAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }}
-            entraAdminSid=${{ secrets.SQL_ADMIN_SID }}
-            entraAdminTenantId=${{ secrets.AZURE_TENANT_ID }}
+          parameters: |
+            {
+              "location": "australiaeast",
+              "namePrefix": "ces",
+              "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
+              "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
+              "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
 
       - name: Display deployment outputs
         run: |
