@@ -21,7 +21,9 @@ def configure_azure_monitor() -> None:
         return
 
     try:
-        from azure.monitor.opentelemetry import configure_azure_monitor as setup_azure_monitor
+        from azure.monitor.opentelemetry import (
+            configure_azure_monitor as setup_azure_monitor,
+        )
 
         setup_azure_monitor(
             connection_string=connection_string,
