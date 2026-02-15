@@ -17,12 +17,12 @@ param privateEndpointSubnetPrefix = '10.0.1.0/24'
 param containerSubnetPrefix = '10.0.2.0/24'
 
 // Load Generator — set deployLoadGenerator=true after pushing the container image
-param deployLoadGenerator = false
+param deployLoadGenerator = true
 
 // Set this to the full image path after building and pushing
 // Get the ACR name from deployment output: az deployment group show -g <rg> -n <deployment> --query properties.outputs.acrLoginServer.value -o tsv
 // Example: param loadGeneratorImage = '<acrLoginServer>/loadgen:latest'
-param loadGeneratorImage = ''
+param loadGeneratorImage = 'acrlycsvk3aaocia.azurecr.io/loadgen:latest'
 
 // Entra ID administrator — replace with your Entra security group details
 param entraAdminLogin = '<entra-admin-group-display-name>'

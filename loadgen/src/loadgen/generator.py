@@ -5,9 +5,11 @@ import random
 import pyodbc
 import structlog
 from faker import Faker
+from opentelemetry import trace
 
 log = structlog.get_logger()
 fake = Faker()
+tracer = trace.get_tracer(__name__)
 
 
 class LoadGenerator:
@@ -65,16 +67,23 @@ class LoadGenerator:
         for operation, weight in operations:
             cumulative += weight
             if choice <= cumulative:
-                try:
-                    operation()
-                except pyodbc.Error as e:
-                    log.warning(
-                        "operation_failed",
-                        database=self.database_name,
-                        operation=operation.__name__,
-                        error=str(e),
-                    )
-                    self.reconnect()
+                with tracer.start_as_current_span(
+                    operation.__name__,
+                    attributes={
+                        "db.name": self.database_name,
+                        "operation.name": operation.__name__,
+                    },
+                ):
+                    try:
+                        operation()
+                    except pyodbc.Error as e:
+                        log.warning(
+                            "operation_failed",
+                            database=self.database_name,
+                            operation=operation.__name__,
+                            error=str(e),
+                        )
+                        self.reconnect()
                 break
 
     def insert_customer_with_order(self) -> None:

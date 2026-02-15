@@ -65,6 +65,8 @@ var uamiName = '${namePrefix}-uami-sql'
 var acrName = 'acr${uniqueString(resourceGroup().id)}' // 16 chars, alphanumeric, globally unique
 var aciName = '${namePrefix}-loadgen'
 var privateDnsZoneName = 'privatelink${environment().suffixes.sqlServerHostname}'
+var logAnalyticsName = '${namePrefix}-log-analytics'
+var appInsightsName = '${namePrefix}-app-insights'
 
 // ============================================================================
 // User-Assigned Managed Identity
@@ -75,6 +77,37 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
   params: {
     name: uamiName
     location: location
+    tags: tags
+  }
+}
+
+// ============================================================================
+// Log Analytics Workspace (for container diagnostics)
+// ============================================================================
+
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.9.0' = {
+  name: 'deploy-log-analytics'
+  params: {
+    name: logAnalyticsName
+    location: location
+    skuName: 'PerGB2018'
+    dataRetention: 30
+    tags: tags
+  }
+}
+
+// ============================================================================
+// Application Insights (for load generator telemetry)
+// ============================================================================
+
+module applicationInsights 'br/public:avm/res/insights/component:0.4.2' = {
+  name: 'deploy-app-insights'
+  params: {
+    name: appInsightsName
+    location: location
+    workspaceResourceId: logAnalyticsWorkspace.outputs.resourceId
+    kind: 'web'
+    applicationType: 'web'
     tags: tags
   }
 }
@@ -269,6 +302,8 @@ module loadGenerator 'modules/container-instance.bicep' = if (deployLoadGenerato
     containerImage: loadGeneratorImage
     minDelaySeconds: '1'
     maxDelaySeconds: '5'
+    appInsightsConnectionString: applicationInsights.outputs.connectionString
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.outputs.resourceId
     tags: tags
   }
 }
@@ -302,3 +337,9 @@ output acrLoginServer string = containerRegistry.outputs.loginServer
 
 @description('The name of the container registry.')
 output acrName string = containerRegistry.outputs.name
+
+@description('The Application Insights connection string.')
+output appInsightsConnectionString string = applicationInsights.outputs.connectionString
+
+@description('The Log Analytics workspace ID.')
+output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.outputs.resourceId

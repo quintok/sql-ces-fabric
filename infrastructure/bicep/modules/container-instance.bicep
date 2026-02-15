@@ -32,6 +32,12 @@ param minDelaySeconds string = '1'
 @description('Maximum delay between operations in seconds.')
 param maxDelaySeconds string = '5'
 
+@description('Application Insights connection string for telemetry.')
+param appInsightsConnectionString string = ''
+
+@description('Log Analytics workspace resource ID for container diagnostics.')
+param logAnalyticsWorkspaceId string = ''
+
 @description('Tags to apply to resources.')
 param tags object = {}
 
@@ -92,10 +98,23 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               name: 'AZURE_CLIENT_ID'
               value: reference(userAssignedIdentityResourceId, '2023-01-31').clientId
             }
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsightsConnectionString
+            }
           ]
         }
       }
     ]
+    
+    // Diagnostics - send container logs to Log Analytics
+    diagnostics: !empty(logAnalyticsWorkspaceId) ? {
+      logAnalytics: {
+        workspaceId: reference(logAnalyticsWorkspaceId, '2022-10-01').customerId
+        workspaceKey: listKeys(logAnalyticsWorkspaceId, '2022-10-01').primarySharedKey
+        logType: 'ContainerInstanceLogs'
+      }
+    } : null
   }
 }
 
