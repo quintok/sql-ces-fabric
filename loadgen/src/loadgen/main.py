@@ -90,14 +90,7 @@ def run_migrations(databases: list[str], migrations_path: str) -> None:
 
 def main() -> int:
     """Main entry point."""
-    # Configure standard logging first (OpenTelemetry hooks into this)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-        stream=sys.stdout,
-    )
-
-    # Configure Azure Monitor for Application Insights telemetry
+    # Configure Azure Monitor FIRST - it hooks into the logging system
     configure_azure_monitor()
 
     # Configure structlog to use Python's standard logging as backend
@@ -119,17 +112,17 @@ def main() -> int:
         cache_logger_on_first_use=True,
     )
 
-    # Add JSON formatting for structured logging
+    # Add JSON formatting for structured logging to console
     formatter = structlog.stdlib.ProcessorFormatter(
         processor=structlog.dev.ConsoleRenderer()
         if sys.stdout.isatty()
         else structlog.processors.JSONRenderer(),
     )
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
-    root_logger.handlers = [handler]
+    root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.INFO)
 
     # Configuration from environment
