@@ -53,17 +53,22 @@ def get_connection_string(database: str) -> str:
 
 def get_yoyo_connection_string(database: str) -> str:
     """Build yoyo-migrations connection string (uses pyodbc under the hood)."""
+    from urllib.parse import quote_plus
+
     server = os.environ["SQL_SERVER"]
 
-    # yoyo uses a different URL format
-    # For Azure SQL with MSI, we need to use the odbc:// scheme
-    return (
-        f"mssql+pyodbc://@{server}/{database}"
-        "?driver=ODBC+Driver+18+for+SQL+Server"
-        "&Authentication=ActiveDirectoryMsi"
-        "&Encrypt=yes"
-        "&TrustServerCertificate=no"
+    # Build ODBC connection string
+    odbc_conn = (
+        f"Driver={{ODBC Driver 18 for SQL Server}};"
+        f"Server={server};"
+        f"Database={database};"
+        "Authentication=ActiveDirectoryMsi;"
+        "Encrypt=yes;"
+        "TrustServerCertificate=no;"
     )
+
+    # yoyo uses odbc:// scheme with URL-encoded connection string
+    return f"odbc:///?odbc_connect={quote_plus(odbc_conn)}"
 
 
 def run_migrations(databases: list[str], migrations_path: str) -> None:
