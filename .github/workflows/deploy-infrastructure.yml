@@ -20,7 +20,6 @@
 #
 # Required GitHub Variables:
 #   AZURE_RG               — Target resource group name
-#   ACR_NAME               — Azure Container Registry name (set after first deploy)
 # =============================================================================
 
 name: Deploy Infrastructure
@@ -39,12 +38,12 @@ on:
   workflow_dispatch:
     inputs:
       deploy_load_generator:
-        description: 'Deploy the load generator container instance'
+        description: 'Deploy the load generator container instance (image auto-discovered from ACR)'
         required: false
         type: boolean
         default: false
       load_generator_image:
-        description: 'Load generator container image (use acrLoginServer output, e.g., <acr>.azurecr.io/loadgen:latest)'
+        description: 'Override image (leave empty for auto-discovery from ACR)'
         required: false
         type: string
         default: ''
@@ -166,6 +165,29 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Discover ACR and container image
+        id: discover
+        if: inputs.deploy_load_generator == true
+        run: |
+          # Get ACR name from resource group
+          ACR_NAME=$(az acr list --resource-group ${{ vars.AZURE_RG }} --query "[0].name" -o tsv)
+          if [ -z "$ACR_NAME" ]; then
+            echo "::error::No ACR found in resource group. Deploy infrastructure first without load generator."
+            exit 1
+          fi
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          
+          # Check if loadgen image exists
+          IMAGE_TAG=$(az acr repository show-tags --name $ACR_NAME --repository loadgen --top 1 --orderby time_desc -o tsv 2>/dev/null || echo "")
+          if [ -z "$IMAGE_TAG" ]; then
+            echo "::error::No loadgen image found in ACR. Run 'Build Load Generator' workflow first."
+            exit 1
+          fi
+          
+          FULL_IMAGE="${ACR_NAME}.azurecr.io/loadgen:latest"
+          echo "load_generator_image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+          echo "Discovered image: $FULL_IMAGE"
+
       - name: Deploy via deployment stack
         id: deploy
         uses: azure/bicep-deploy@v2
@@ -185,7 +207,7 @@ jobs:
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": ${{ inputs.deploy_load_generator || false }},
-              "loadGeneratorImage": "${{ inputs.load_generator_image || '' }}"
+              "loadGeneratorImage": "${{ steps.discover.outputs.load_generator_image || inputs.load_generator_image || '' }}"
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
