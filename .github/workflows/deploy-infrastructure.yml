@@ -6,6 +6,10 @@
 #   - Drift protection (once deny settings enabled)
 #   - Single stack name with versioned history
 #
+# Load generator auto-deployment:
+#   - Automatically detects ACR and loadgen image in resource group
+#   - Deploys ACI if both are present, skips otherwise
+#
 # Triggers:
 #   - Push to main   → deploys infrastructure via stack
 #   - Pull request   → validates and previews changes
@@ -36,17 +40,8 @@ on:
       - 'infrastructure/bicep/**'
       - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
-    inputs:
-      deploy_load_generator:
-        description: 'Deploy the load generator container instance (image auto-discovered from ACR)'
-        required: false
-        type: boolean
-        default: false
-      load_generator_image:
-        description: 'Override image (leave empty for auto-discovery from ACR)'
-        required: false
-        type: string
-        default: ''
+    # Load generator deployment is automatic when ACR and image are detected
+    # No manual inputs required
 
 permissions:
   id-token: write
@@ -91,8 +86,8 @@ jobs:
               "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
-              "deployLoadGenerator": ${{ inputs.deploy_load_generator || false }},
-              "loadGeneratorImage": "${{ inputs.load_generator_image || '' }}"
+              "deployLoadGenerator": false,
+              "loadGeneratorImage": ""
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
@@ -167,26 +162,28 @@ jobs:
 
       - name: Discover ACR and container image
         id: discover
-        if: inputs.deploy_load_generator == true
         run: |
           # Get ACR name from resource group
           ACR_NAME=$(az acr list --resource-group ${{ vars.AZURE_RG }} --query "[0].name" -o tsv)
           if [ -z "$ACR_NAME" ]; then
-            echo "::error::No ACR found in resource group. Deploy infrastructure first without load generator."
-            exit 1
+            echo "No ACR found - skipping load generator deployment"
+            echo "deploy_load_generator=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
           echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
           
           # Check if loadgen image exists
           IMAGE_TAG=$(az acr repository show-tags --name $ACR_NAME --repository loadgen --top 1 --orderby time_desc -o tsv 2>/dev/null || echo "")
           if [ -z "$IMAGE_TAG" ]; then
-            echo "::error::No loadgen image found in ACR. Run 'Build Load Generator' workflow first."
-            exit 1
+            echo "No loadgen image found in ACR - skipping load generator deployment"
+            echo "deploy_load_generator=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
           FULL_IMAGE="${ACR_NAME}.azurecr.io/loadgen:latest"
           echo "load_generator_image=$FULL_IMAGE" >> $GITHUB_OUTPUT
-          echo "Discovered image: $FULL_IMAGE"
+          echo "deploy_load_generator=true" >> $GITHUB_OUTPUT
+          echo "Discovered image: $FULL_IMAGE - will deploy load generator"
 
       - name: Deploy via deployment stack
         id: deploy
@@ -206,15 +203,18 @@ jobs:
               "entraAdminLogin": "${{ secrets.SQL_ADMIN_LOGIN }}",
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
-              "deployLoadGenerator": ${{ inputs.deploy_load_generator || false }},
-              "loadGeneratorImage": "${{ steps.discover.outputs.load_generator_image || inputs.load_generator_image || '' }}"
+              "deployLoadGenerator": ${{ steps.discover.outputs.deploy_load_generator || false }},
+              "loadGeneratorImage": "${{ steps.discover.outputs.load_generator_image || '' }}"
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
 
       - name: Display deployment outputs
         run: |
-          echo "SQL Server: ${{ steps.deploy.outputs.sqlServerFqdn }}"
-          echo "UAMI Client ID: ${{ steps.deploy.outputs.uamiClientId }}"
-          echo "ACR Login Server: ${{ steps.deploy.outputs.acrLoginServer }}"
-          echo "ACR Name: ${{ steps.deploy.outputs.acrName }}"
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| SQL Server | ${{ steps.deploy.outputs.sqlServerFqdn }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UAMI Client ID | ${{ steps.deploy.outputs.uamiClientId }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ACR Login Server | ${{ steps.deploy.outputs.acrLoginServer }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Generator | ${{ steps.discover.outputs.deploy_load_generator == 'true' && '✅ Deployed' || '⏭️ Skipped (no image)' }} |" >> $GITHUB_STEP_SUMMARY
