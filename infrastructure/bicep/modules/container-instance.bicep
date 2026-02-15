@@ -26,6 +26,9 @@ param databases string = 'tenant_db_alpha,tenant_db_beta'
 @description('Container image to deploy (include registry).')
 param containerImage string
 
+@description('ACR login server (e.g., myacr.azurecr.io).')
+param acrServer string
+
 @description('Minimum delay between operations in seconds.')
 param minDelaySeconds string = '1'
 
@@ -58,6 +61,14 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
   properties: {
     osType: 'Linux'
     restartPolicy: 'Always'
+    
+    // Use managed identity to pull from ACR
+    imageRegistryCredentials: [
+      {
+        server: acrServer
+        identity: userAssignedIdentityResourceId
+      }
+    ]
     
     // VNet integration
     subnetIds: [

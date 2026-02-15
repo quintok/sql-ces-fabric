@@ -286,12 +286,30 @@ module containerRegistry 'modules/container-registry.bicep' = {
   }
 }
 
+// Grant managed identity AcrPull role on ACR (required for ACI to pull images)
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, acrName, uamiName, 'acrpull')
+  scope: containerRegistryResource
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
+    principalId: userAssignedIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Reference to deployed ACR for role assignment scope
+resource containerRegistryResource 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: acrName
+  dependsOn: [containerRegistry]
+}
+
 // ============================================================================
 // Load Generator Container Instance (conditional)
 // ============================================================================
 
 module loadGenerator 'modules/container-instance.bicep' = if (deployLoadGenerator && !empty(loadGeneratorImage)) {
   name: 'deploy-loadgen'
+  dependsOn: [acrPullRoleAssignment] // Wait for ACR pull permission
   params: {
     name: aciName
     location: location
@@ -300,6 +318,7 @@ module loadGenerator 'modules/container-instance.bicep' = if (deployLoadGenerato
     sqlServerFqdn: sqlServer.outputs.fullyQualifiedDomainName
     databases: 'tenant_db_alpha,tenant_db_beta'
     containerImage: loadGeneratorImage
+    acrServer: containerRegistry.outputs.loginServer
     minDelaySeconds: '1'
     maxDelaySeconds: '5'
     appInsightsConnectionString: applicationInsights.outputs.connectionString
