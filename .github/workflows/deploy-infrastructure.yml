@@ -20,7 +20,7 @@
 #   AZURE_SUBSCRIPTION_ID  — Target Azure subscription ID
 #   AZURE_TENANT_ID        — Entra ID tenant ID
 #   SQL_ADMIN_SID          — Entra ID object ID for the SQL administrator group
-#   SQL_ADMIN_LOGIN        — Display name of the SQL Entra admin group
+#   SQL_ADMIN_LOGIN        — Email/UPN of the SQL & Fabric admin (e.g. user@domain.com)
 #
 # Required GitHub Variables:
 #   AZURE_RG               — Target resource group name
@@ -40,8 +40,12 @@ on:
       - 'infrastructure/bicep/**'
       - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
-    # Load generator deployment is automatic when ACR and image are detected
-    # No manual inputs required
+    inputs:
+      deploy_fabric_capacity:
+        description: 'Deploy Fabric F2 capacity'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -87,7 +91,10 @@ jobs:
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": false,
-              "loadGeneratorImage": ""
+              "loadGeneratorImage": "",
+              "deployFabricCapacity": false,
+              "fabricAdminMembers": [],
+              "fabricCapacityName": "e743ea18139a49389cc04d8af013fa5f"
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
@@ -132,7 +139,10 @@ jobs:
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": false,
-              "loadGeneratorImage": ""
+              "loadGeneratorImage": "",
+              "deployFabricCapacity": false,
+              "fabricAdminMembers": [],
+              "fabricCapacityName": "e743ea18139a49389cc04d8af013fa5f"
             }
 
   # ===========================================================================
@@ -204,7 +214,10 @@ jobs:
               "entraAdminSid": "${{ secrets.SQL_ADMIN_SID }}",
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": ${{ steps.discover.outputs.deploy_load_generator || false }},
-              "loadGeneratorImage": "${{ steps.discover.outputs.load_generator_image || '' }}"
+              "loadGeneratorImage": "${{ steps.discover.outputs.load_generator_image || '' }}",
+              "deployFabricCapacity": ${{ inputs.deploy_fabric_capacity || false }},
+              "fabricAdminMembers": ["${{ secrets.SQL_ADMIN_LOGIN }}"],
+              "fabricCapacityName": "e743ea18139a49389cc04d8af013fa5f"
             }
           action-on-unmanage-resources: detach
           deny-settings-mode: none
@@ -218,3 +231,4 @@ jobs:
           echo "| UAMI Client ID | ${{ steps.deploy.outputs.uamiClientId }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ACR Login Server | ${{ steps.deploy.outputs.acrLoginServer }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Load Generator | ${{ steps.discover.outputs.deploy_load_generator == 'true' && '✅ Deployed' || '⏭️ Skipped (no image)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fabric Capacity | ${{ inputs.deploy_fabric_capacity == true && '✅ Deployed (F2)' || '⏭️ Skipped' }} |" >> $GITHUB_STEP_SUMMARY

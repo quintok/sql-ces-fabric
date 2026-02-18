@@ -9,6 +9,7 @@
 //       - Elastic Pool (Standard 200 eDTU)
 //       - Databases: tenant_db_alpha, tenant_db_beta
 //       - Private Endpoint for secure connectivity
+//   - Microsoft Fabric Capacity (F2 SKU for workspace binding)
 // ============================================================================
 
 targetScope = 'resourceGroup'
@@ -52,6 +53,15 @@ param entraAdminTenantId string = tenant().tenantId
 @description('Tags to apply to all resources.')
 param tags object = {}
 
+@description('Deploy the Fabric capacity. Set to true to provision F2 capacity for workspace binding.')
+param deployFabricCapacity bool = false
+
+@description('Fabric capacity admin members (email addresses). Required when deployFabricCapacity is true.')
+param fabricAdminMembers array = []
+
+@description('Fabric capacity name (3-63 chars, lowercase alphanumeric only, must start with letter).')
+param fabricCapacityName string = ''
+
 // ============================================================================
 // Variables
 // ============================================================================
@@ -67,6 +77,7 @@ var aciName = '${namePrefix}-loadgen'
 var privateDnsZoneName = 'privatelink${environment().suffixes.sqlServerHostname}'
 var logAnalyticsName = '${namePrefix}-log-analytics'
 var appInsightsName = '${namePrefix}-app-insights'
+var fabricCapacityNameResolved = !empty(fabricCapacityName) ? fabricCapacityName : '${namePrefix}fabric' // Default or provided, must be alphanumeric, 3-63 chars
 
 // ============================================================================
 // User-Assigned Managed Identity
@@ -286,21 +297,22 @@ module containerRegistry 'modules/container-registry.bicep' = {
   }
 }
 
+// Reference to deployed ACR for role assignment scope
+// Note: Using static name (acrName variable) since uniqueString is deterministic
+resource containerRegistryResource 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: acrName
+}
+
 // Grant managed identity AcrPull role on ACR (required for ACI to pull images)
 resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroup().id, acrName, uamiName, 'acrpull')
   scope: containerRegistryResource
+  dependsOn: [containerRegistry] // Ensure ACR is deployed first
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
     principalId: userAssignedIdentity.outputs.principalId
     principalType: 'ServicePrincipal'
   }
-}
-
-// Reference to deployed ACR for role assignment scope
-resource containerRegistryResource 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: acrName
-  dependsOn: [containerRegistry]
 }
 
 // ============================================================================
@@ -323,6 +335,21 @@ module loadGenerator 'modules/container-instance.bicep' = if (deployLoadGenerato
     maxDelaySeconds: '5'
     appInsightsConnectionString: applicationInsights.outputs.connectionString
     logAnalyticsWorkspaceId: logAnalyticsWorkspace.outputs.resourceId
+    tags: tags
+  }
+}
+
+// ============================================================================
+// Microsoft Fabric Capacity (conditional)
+// ============================================================================
+
+module fabricCapacity 'br/public:avm/res/fabric/capacity:0.1.2' = if (deployFabricCapacity && !empty(fabricAdminMembers)) {
+  name: 'deploy-fabric-capacity'
+  params: {
+    name: fabricCapacityNameResolved
+    location: location
+    adminMembers: fabricAdminMembers
+    skuName: 'F2'
     tags: tags
   }
 }
@@ -362,3 +389,9 @@ output appInsightsConnectionString string = applicationInsights.outputs.connecti
 
 @description('The Log Analytics workspace ID.')
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.outputs.resourceId
+
+@description('The name of the Fabric capacity (empty if not deployed).')
+output fabricCapacityName string = fabricCapacity.?outputs.?name ?? ''
+
+@description('The resource ID of the Fabric capacity (empty if not deployed).')
+output fabricCapacityResourceId string = fabricCapacity.?outputs.?resourceId ?? ''

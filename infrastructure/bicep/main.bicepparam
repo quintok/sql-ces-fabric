@@ -35,3 +35,18 @@ param tags = {
   Project: 'sql-ces-fabric'
   ManagedBy: 'Bicep'
 }
+
+// ============================================================================
+// Microsoft Fabric Capacity (F2 SKU)
+// ============================================================================
+// Set deployFabricCapacity=true and provide admin email(s) to provision
+// an F2 Fabric capacity for binding workspaces.
+// Note: F2 is the smallest SKU (~$262/month when running).
+// Naming rules: 3-63 chars, lowercase alphanumeric only, must start with letter.
+// ============================================================================
+param deployFabricCapacity = false
+param fabricAdminMembers = [
+  // '<your-email@domain.com>'
+]
+// GUID without hyphens (hyphens not allowed in Fabric capacity names)
+param fabricCapacityName = 'e743ea18139a49389cc04d8af013fa5f'
