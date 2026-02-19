@@ -40,12 +40,6 @@ on:
       - 'infrastructure/bicep/**'
       - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
-    inputs:
-      deploy_fabric_capacity:
-        description: 'Deploy Fabric F2 capacity'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   id-token: write
@@ -92,7 +86,7 @@ jobs:
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": false,
               "loadGeneratorImage": "",
-              "deployFabricCapacity": false,
+              "deployFabricCapacity": true,
               "fabricAdminMembers": [],
               "fabricCapacityName": "e743ea18139a49389cc04d8af013fa5f"
             }
@@ -140,7 +134,7 @@ jobs:
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": false,
               "loadGeneratorImage": "",
-              "deployFabricCapacity": false,
+              "deployFabricCapacity": true,
               "fabricAdminMembers": [],
               "fabricCapacityName": "e743ea18139a49389cc04d8af013fa5f"
             }
@@ -215,7 +209,7 @@ jobs:
               "entraAdminTenantId": "${{ secrets.AZURE_TENANT_ID }}",
               "deployLoadGenerator": ${{ steps.discover.outputs.deploy_load_generator || false }},
               "loadGeneratorImage": "${{ steps.discover.outputs.load_generator_image || '' }}",
-              "deployFabricCapacity": ${{ inputs.deploy_fabric_capacity || false }},
+              "deployFabricCapacity": true,
               "fabricAdminMembers": ["${{ secrets.SQL_ADMIN_LOGIN }}"],
               "fabricCapacityName": "e743ea18139a49389cc04d8af013fa5f"
             }
@@ -231,4 +225,4 @@ jobs:
           echo "| UAMI Client ID | ${{ steps.deploy.outputs.uamiClientId }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ACR Login Server | ${{ steps.deploy.outputs.acrLoginServer }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Load Generator | ${{ steps.discover.outputs.deploy_load_generator == 'true' && '✅ Deployed' || '⏭️ Skipped (no image)' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Fabric Capacity | ${{ inputs.deploy_fabric_capacity == true && '✅ Deployed (F2)' || '⏭️ Skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fabric Capacity | ✅ Deployed (F2) |" >> $GITHUB_STEP_SUMMARY

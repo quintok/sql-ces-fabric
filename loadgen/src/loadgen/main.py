@@ -162,6 +162,11 @@ def get_yoyo_connection_string(database: str) -> str:
         "TrustServerCertificate=no;"
     )
 
+    # >>> ODBC_DIAGNOSTICS >>>
+    print(f"[YOYO DEBUG] Raw ODBC conn string: {odbc_conn}", flush=True)
+    print(f"[YOYO DEBUG] URL-encoded: {quote_plus(odbc_conn)}", flush=True)
+    # <<< ODBC_DIAGNOSTICS <<<
+
     # yoyo uses odbc:// scheme with URL-encoded connection string
     return f"odbc:///?odbc_connect={quote_plus(odbc_conn)}"
 
@@ -171,7 +176,26 @@ def run_migrations(databases: list[str], migrations_path: str) -> None:
     for db in databases:
         log.info("running_migrations", database=db)
         try:
-            backend = get_backend(get_yoyo_connection_string(db))
+            # >>> ODBC_DIAGNOSTICS - Test direct pyodbc connection >>>
+            import pyodbc
+
+            raw_odbc = get_connection_string(db)
+            print(f"[PYODBC TEST] Testing direct connection to {db}...", flush=True)
+            print(f"[PYODBC TEST] Raw ODBC string: {raw_odbc}", flush=True)
+            try:
+                test_conn = pyodbc.connect(raw_odbc, timeout=10)
+                print("[PYODBC TEST] Direct pyodbc connection SUCCESS ✓", flush=True)
+                test_conn.close()
+            except Exception as e:
+                print(f"[PYODBC TEST] Direct pyodbc connection FAILED: {e}", flush=True)
+            # <<< ODBC_DIAGNOSTICS <<<
+
+            # >>> ODBC_DIAGNOSTICS >>>
+            conn_str = get_yoyo_connection_string(db)
+            print(f"[YOYO DEBUG] Connection string for {db}:", flush=True)
+            print(f"  {conn_str}", flush=True)
+            # <<< ODBC_DIAGNOSTICS <<<
+            backend = get_backend(conn_str)
             migrations = read_migrations(migrations_path)
 
             with backend.lock():
