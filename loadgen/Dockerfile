@@ -28,19 +28,27 @@ RUN uv pip install --python /app/.venv/bin/python .
 # Runtime stage
 # ============================================================================
 # Pin to Bookworm to match Microsoft ODBC driver repository
+# Note: ODBC Driver 18 requires x86_64 - use --platform linux/amd64 at build time
 FROM python:3.12-slim-bookworm AS runtime
 
 # Install ODBC Driver 18 for SQL Server and runtime dependencies
+# Split into separate commands for better error visibility during build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg2 \
     unixodbc \
-    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Microsoft repository and install ODBC driver
+RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Verify ODBC driver is properly installed and registered
+RUN odbcinst -q -d -n "ODBC Driver 18 for SQL Server" || (echo "ODBC Driver installation failed!" && cat /etc/odbcinst.ini && exit 1)
 
 WORKDIR /app
 

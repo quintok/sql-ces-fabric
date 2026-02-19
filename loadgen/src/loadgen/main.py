@@ -2,8 +2,10 @@
 
 import logging
 import os
+import subprocess
 import sys
 import time
+from pathlib import Path
 
 import structlog
 from yoyo import get_backend, read_migrations
@@ -11,6 +13,99 @@ from yoyo import get_backend, read_migrations
 from loadgen.generator import LoadGenerator
 
 log = structlog.get_logger()
+
+
+# >>> ODBC_DIAGNOSTICS - Remove this section after issue is resolved >>>
+def diagnose_odbc_setup() -> None:
+    """
+    Log ODBC driver diagnostic information at startup.
+    This helps confirm the driver is properly installed in the container.
+    TEMPORARY: Remove after ODBC driver issue is resolved.
+    """
+    print("=" * 60, flush=True)
+    print("ODBC DRIVER DIAGNOSTICS", flush=True)
+    print("=" * 60, flush=True)
+
+    # Check 1: List installed ODBC drivers via odbcinst
+    try:
+        result = subprocess.run(
+            ["odbcinst", "-q", "-d"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        print(f"[odbcinst -q -d] Installed drivers:\n{result.stdout}", flush=True)
+        if result.stderr:
+            print(f"[odbcinst stderr]: {result.stderr}", flush=True)
+    except Exception as e:
+        print(f"[odbcinst] Failed to query drivers: {e}", flush=True)
+
+    # Check 2: Verify ODBC Driver 18 specifically
+    try:
+        result = subprocess.run(
+            ["odbcinst", "-q", "-d", "-n", "ODBC Driver 18 for SQL Server"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            print("[ODBC Driver 18] Driver is registered ✓", flush=True)
+            print(f"  Details: {result.stdout.strip()}", flush=True)
+        else:
+            print(
+                f"[ODBC Driver 18] Driver NOT registered! stderr: {result.stderr}",
+                flush=True,
+            )
+    except Exception as e:
+        print(f"[ODBC Driver 18] Check failed: {e}", flush=True)
+
+    # Check 3: Show odbcinst.ini contents
+    odbcinst_path = Path("/etc/odbcinst.ini")
+    if odbcinst_path.exists():
+        print(f"\n[{odbcinst_path}] Contents:", flush=True)
+        print(odbcinst_path.read_text(), flush=True)
+    else:
+        print(f"[{odbcinst_path}] File does not exist!", flush=True)
+
+    # Check 4: Verify driver library exists
+    driver_paths = [
+        "/opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.5.so.1.1",
+        "/opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.4.so.1.1",
+        "/opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.3.so.3.1",
+    ]
+    print("\n[Driver library check]:", flush=True)
+    for path in driver_paths:
+        if Path(path).exists():
+            print(f"  Found: {path} ✓", flush=True)
+            break
+    else:
+        # List what actually exists
+        driver_dir = Path("/opt/microsoft/msodbcsql18/lib64")
+        if driver_dir.exists():
+            files = list(driver_dir.glob("*"))
+            print(f"  Driver dir contents: {[f.name for f in files]}", flush=True)
+        else:
+            print("  /opt/microsoft/msodbcsql18/lib64 does not exist!", flush=True)
+
+    # Check 5: pyodbc drivers list
+    try:
+        import pyodbc
+
+        drivers = pyodbc.drivers()
+        print(f"\n[pyodbc.drivers()] Available: {drivers}", flush=True)
+        if "ODBC Driver 18 for SQL Server" in drivers:
+            print("  ODBC Driver 18 available to pyodbc ✓", flush=True)
+        else:
+            print("  WARNING: ODBC Driver 18 NOT in pyodbc.drivers()!", flush=True)
+    except Exception as e:
+        print(f"[pyodbc.drivers()] Failed: {e}", flush=True)
+
+    print("=" * 60, flush=True)
+    print("END ODBC DIAGNOSTICS", flush=True)
+    print("=" * 60 + "\n", flush=True)
+
+
+# <<< ODBC_DIAGNOSTICS <<<
 
 
 def configure_azure_monitor() -> None:
@@ -90,7 +185,11 @@ def run_migrations(databases: list[str], migrations_path: str) -> None:
 
 def main() -> int:
     """Main entry point."""
-    # Configure Azure Monitor FIRST - it hooks into the logging system
+    # >>> ODBC_DIAGNOSTICS - Remove these 2 lines after issue is resolved >>>
+    diagnose_odbc_setup()
+    # <<< ODBC_DIAGNOSTICS <<<
+
+    # Configure Azure Monitor - it hooks into the logging system
     configure_azure_monitor()
 
     # Configure structlog to use Python's standard logging as backend

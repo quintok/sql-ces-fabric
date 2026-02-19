@@ -28,12 +28,53 @@ class LoadGenerator:
         self.max_delay = max_delay
         self._connection: pyodbc.Connection | None = None
 
+    # >>> ODBC_DIAGNOSTICS - Remove this method after issue is resolved >>>
+    def _sanitize_connection_string(self) -> str:
+        """Return connection string with sensitive parts masked for logging. TEMPORARY."""
+        # For MSI auth, there's no password, but mask Server name partially
+        parts = self.connection_string.split(";")
+        sanitized = []
+        for part in parts:
+            if part.lower().startswith("server="):
+                # Show server but mask if it contains sensitive info
+                sanitized.append(part)
+            elif "password" in part.lower() or "pwd" in part.lower():
+                sanitized.append("***MASKED***")
+            else:
+                sanitized.append(part)
+        return ";".join(sanitized)
+
+    # <<< ODBC_DIAGNOSTICS <<<
+
     @property
     def connection(self) -> pyodbc.Connection:
         """Lazy connection with auto-reconnect."""
         if self._connection is None:
-            log.info("connecting_to_database", database=self.database_name)
-            self._connection = pyodbc.connect(self.connection_string, autocommit=True)
+            # >>> ODBC_DIAGNOSTICS - Revert to simple version after issue is resolved >>>
+            log.info(
+                "connecting_to_database",
+                database=self.database_name,
+                connection_string=self._sanitize_connection_string(),
+            )
+            try:
+                self._connection = pyodbc.connect(
+                    self.connection_string, autocommit=True
+                )
+                log.info("connection_successful", database=self.database_name)
+            except pyodbc.Error as e:
+                log.error(
+                    "connection_failed",
+                    database=self.database_name,
+                    error_code=e.args[0] if e.args else "unknown",
+                    error_message=str(e),
+                    connection_string=self._sanitize_connection_string(),
+                    pyodbc_version=pyodbc.version,
+                    available_drivers=pyodbc.drivers(),
+                )
+                raise
+            # <<< ODBC_DIAGNOSTICS - Original was just: >>>
+            # log.info("connecting_to_database", database=self.database_name)
+            # self._connection = pyodbc.connect(self.connection_string, autocommit=True)
         return self._connection
 
     def reconnect(self) -> None:
